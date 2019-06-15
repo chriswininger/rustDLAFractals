@@ -13,23 +13,25 @@ const HEIGHT: u32 = 500;
 const ONE_DIMENSIONAL_LENGTH: u32 = WIDTH * HEIGHT;
 
 fn main() {
-   let mut dlaField = DLAField::new(NUM_POINTS);
+   let mut dlaField =
+      DLAField::new(NUM_POINTS, WIDTH as usize, HEIGHT as usize);
+
    let mut trials = 0;
    while !dlaField.nextState() {
       if trials % 10 == 0 {
-         println!("statelopp running");
+         println!("state loop running");
          saveToPNG(&dlaField);
       }
 
       trials += 1;
    }
 
-   println!("!!! app done");
+   println!("done");
    saveToPNG(&dlaField);
 }
 
 fn saveToPNG(dlaField: &DLAField) {
-   let path = Path::new(r"/home/chris/projects/rustDLAFractals/testImageFractal.png");
+   let path = Path::new(r"/Users/chris/projects/rustDLAFractals/testImageFractal.png");
    let file = File::create(path).unwrap();
    let ref mut w = BufWriter::new(file);
 
@@ -39,14 +41,4 @@ fn saveToPNG(dlaField: &DLAField) {
 
    let data = dlaField.getOneDimensionalRepresentation();
    writer.write_image_data(&data).unwrap();
-}
-
-#[cfg(test)]
-mod tests {
-   use super::*;
-
-   #[test]
-   fn test_add() {
-      assert_eq!(2, 2);
-   }
 }

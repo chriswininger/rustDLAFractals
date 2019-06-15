@@ -2,16 +2,14 @@ extern crate rand;
 
 use rand::Rng;
 
-const WIDTH: u32 = 500;
-const HEIGHT: u32 = 500;
-const ONE_DIMENSIONAL_LENGTH: u32 = WIDTH * HEIGHT;
-
+#[derive(Clone)]
 pub struct ColorizedPoint {
   pub x: u32,
   pub y: u32,
   pub color: [u8; 4]
 }
 
+#[derive(Clone)]
 pub enum FieldPosition {
   EMPTY,
   OCCUPIED(ColorizedPoint),
@@ -19,24 +17,23 @@ pub enum FieldPosition {
 }
 
 pub struct DLAField {
-  pub numPoints: i32,
   pub field: Vec<ColorizedPoint>,
   pub positionHash: Vec<Vec<FieldPosition>>
 }
 
 impl DLAField {
-  pub fn new(numPoints: i32) -> DLAField {
+  pub fn new(numPoints: i32, width: usize, height: usize) -> DLAField {
     let mut rng = rand::thread_rng();
-    let mut positionHash = DLAField::generateEmptyPositionHash();
+    let mut positionHash = DLAField::generateEmptyPositionHash(width, height);
 
     let field = (0..numPoints)
        .map(|ndx| {
-         let mut x = rng.gen_range(0, WIDTH);
-         let mut y = rng.gen_range(0, HEIGHT);
+         let mut x = rng.gen_range(0, width as u32);
+         let mut y = rng.gen_range(0, height as u32);
 
          while DLAField::isPositionOccupied(&positionHash, x as i32, y as i32) {
-           x = rng.gen_range(0, WIDTH);
-           y = rng.gen_range(0, HEIGHT);
+           x = rng.gen_range(0, width as u32);
+           y = rng.gen_range(0, height as u32);
          }
 
          positionHash[x as usize][y as usize] = FieldPosition::OCCUPIED(ColorizedPoint {
@@ -55,17 +52,21 @@ impl DLAField {
        .collect();
 
     DLAField {
-      numPoints,
       field,
       positionHash
     }
   }
 
-  pub fn getOneDimensionalRepresentation(&self) -> [u8; ONE_DIMENSIONAL_LENGTH as usize * 4] {
-    let mut values = [0; ONE_DIMENSIONAL_LENGTH as usize * 4];
-    for i in 0..ONE_DIMENSIONAL_LENGTH {
-      let x = i % WIDTH;
-      let y = i / HEIGHT;
+  pub fn getOneDimensionalRepresentation(&self) -> Vec<u8> {
+    let width = self.getWidth();
+    let height = self.getHeight();
+    let oneDimensionalLen = width * height;
+
+    let mut values = vec![0 as u8; oneDimensionalLen * 4];
+
+    for i in 0..oneDimensionalLen {
+      let x = i % width;
+      let y = i / height;
 
       let ndx = i as usize * 4;
 
@@ -82,35 +83,63 @@ impl DLAField {
       }
     }
 
-    values
+    values.to_vec()
   }
 
   pub fn nextState(&mut self) -> bool {
     let mut isDone = true;
 
     let mut cntStuck = 0;
-    for x in 0..WIDTH {
-      for y in 0..HEIGHT {
+    for x in 0..self.getWidth() as u32 {
+      for y in 0..self.getHeight() as u32 {
         let stuck = self.isStuck(x as i32, y as i32, false);
+        let curVal =  &self.positionHash[x as usize][y as usize];
 
-        if !stuck {
+        if stuck {
           cntStuck += 1;
         }
 
-        if  !stuck && !self.isEmpty(x as i32, y as i32) {
-          isDone = false;
+        match curVal {
+          FieldPosition::OCCUPIED(point) => {
+            if !stuck {
+              isDone = false;
 
-          let newPosition = self.findNextPosition(x as i32, y as i32);
+              let newPosition = self.findNextPosition(x as i32, y as i32);
 
-          self.positionHash[newPosition.0 as usize][newPosition.1 as usize] =
-             FieldPosition::OCCUPIED(ColorizedPoint {
-               x: newPosition.0 as u32,
-               y: newPosition.1 as u32,
-               color: [255, 0, 0, 255]
-             });
+              self.positionHash[newPosition.0 as usize][newPosition.1 as usize] =
+                  FieldPosition::OCCUPIED(ColorizedPoint {
+                    x: newPosition.0 as u32,
+                    y: newPosition.1 as u32,
+                    color: [255, 0, 0, 255]
+                  });
 
-          self.positionHash[x as usize][y as usize] = FieldPosition::EMPTY;
+              self.positionHash[x as usize][y as usize] = FieldPosition::EMPTY;
+            } else {
+              self.positionHash[x as usize][y as usize] = FieldPosition::STUCK;
+            }
+          },
+          FieldPosition::STUCK => {},
+          FieldPosition::EMPTY => {}
         }
+
+//        if  !stuck && !self.isEmpty(x as i32, y as i32) {
+//          isDone = false;
+//
+//          let newPosition = self.findNextPosition(x as i32, y as i32);
+//
+//          self.positionHash[newPosition.0 as usize][newPosition.1 as usize] =
+//             FieldPosition::OCCUPIED(ColorizedPoint {
+//               x: newPosition.0 as u32,
+//               y: newPosition.1 as u32,
+//               color: [255, 0, 0, 255]
+//             });
+//
+//          self.positionHash[x as usize][y as usize] = FieldPosition::EMPTY;
+//        } else if let FieldPosition::OCCUPIED(ColorizedPoint) = self.positionHash[x as usize][y as usize] {
+//          if stuck {
+//            self.positionHash[x as usize][y as usize] = FieldPosition::STUCK
+//          }
+//        }
       }
     }
 
@@ -120,10 +149,18 @@ impl DLAField {
     isDone
   }
 
-  fn generateEmptyPositionHash() -> Vec<Vec<FieldPosition>> {
-    (0..WIDTH)
+  pub fn getWidth(&self) -> usize {
+    self.positionHash.len()
+  }
+
+  pub fn getHeight(&self) -> usize {
+    self.positionHash[0].len()
+  }
+
+  fn generateEmptyPositionHash(width: usize, height: usize) -> Vec<Vec<FieldPosition>> {
+    (0..width)
        .map(|x| {
-         let col = (0..HEIGHT)
+         let col = (0..height)
             .map(|y| {
               FieldPosition::EMPTY
             })
@@ -138,8 +175,10 @@ impl DLAField {
     let mut rng = rand::thread_rng();
     let mut newX = if rng.gen_bool(0.5) { x + 1 } else { x - 1 };
     let mut newY = if rng.gen_bool(0.75) { y + 1 } else { y - 1 };
+    let width = self.getWidth() as i32;
+    let height = self.getHeight() as i32;
 
-    while newX < 0 || newY < 0 || newX >= WIDTH as i32 || newY >= HEIGHT as i32 {
+    while newX < 0 || newY < 0 || newX >= width as i32 || newY >= height as i32 {
       newX = if rng.gen_bool(0.5) { x + 1 } else { x - 1 };
       newY = if rng.gen_bool(0.75) { y + 1 } else { y - 1 };
     }
@@ -147,7 +186,7 @@ impl DLAField {
     let mut attemptCount = 0;
 
     while  DLAField::isPositionOccupied(&self.positionHash, newX, newY) && attemptCount <= 4 {
-      while newX < 0 || newY < 0 || newX >= WIDTH as i32 || newY >= HEIGHT as i32 {
+      while newX < 0 || newY < 0 || newX >= width as i32 || newY >= height as i32 {
         newX = if rng.gen_bool(0.5) { x + 1 } else { x - 1 };
         newY = if rng.gen_bool(0.75) { y + 1 } else { y - 1 };
       }
@@ -178,9 +217,14 @@ impl DLAField {
 //         return  true
 //      } else
 
-    if let FieldPosition::STUCK = self.positionHash[x as usize][y as usize] { // SEEMS LIKE WE SHOULD ALWAYS CHECK AND SAY STUCK IF THIS IS STUCK AND JUST NEED TO MAKE SURE WE NEVER ASK OUTSIDE BOUNDS
+    let width = self.getWidth() as i32;
+    let height = self.getHeight() as i32;
+
+    if let FieldPosition::EMPTY = self.positionHash[x as usize][y as usize] {
+      return false
+    } else if let FieldPosition::STUCK = self.positionHash[x as usize][y as usize] { // SEEMS LIKE WE SHOULD ALWAYS CHECK AND SAY STUCK IF THIS IS STUCK AND JUST NEED TO MAKE SURE WE NEVER ASK OUTSIDE BOUNDS
       return true
-    } else if y + 1 >= HEIGHT as i32 {
+    } else if y >= height - 1 as i32 {
       return true
     } else if recursion {
       return false
@@ -202,7 +246,7 @@ impl DLAField {
         let neighborX = x + dx as i32;
         let neighborY = y + dy as i32;
 
-        if neighborX < WIDTH as i32 && neighborY < HEIGHT as i32 && self.isStuck(neighborX, neighborY, true) {
+        if neighborX < width as i32 && neighborY < height as i32 && self.isStuck(neighborX, neighborY, true) {
           return true
         }
 
@@ -221,5 +265,88 @@ impl DLAField {
     }
 
     false
+  }
+}
+
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn isPositionOccupied_shouldReturnCorrectValues() {
+    let colorizedPoint1: ColorizedPoint = ColorizedPoint { x: 0, y: 0, color: [0 ,0, 0,0 ]};
+    let positionHash = [
+      [FieldPosition::EMPTY, FieldPosition::OCCUPIED(colorizedPoint1)].to_vec(),
+      [FieldPosition::STUCK, FieldPosition::EMPTY].to_vec()
+    ].to_vec();
+
+    let position = DLAField::isPositionOccupied(&positionHash, 0, 0);
+    assert_eq!(position, false);
+
+    let position = DLAField::isPositionOccupied(&positionHash, 0, 1);
+    assert_eq!(position, true);
+
+    let position = DLAField::isPositionOccupied(&positionHash, 1, 0);
+    assert_eq!(position, true);
+
+    let position = DLAField::isPositionOccupied(&positionHash, 1, 1);
+    assert_eq!(position, false);
+  }
+
+  #[test]
+  fn isStuck_shouldReturnCorrectValues() {
+    let colorizedPoint1 = ColorizedPoint {
+      x: 0,
+      y: 0,
+      color: [255, 255, 255, 255]
+    };
+
+    let colorizedPoint2 = ColorizedPoint {
+      x: 0,
+      y: 0,
+      color: [255, 255, 255, 255]
+    };
+
+    let colorizedPoint3 = ColorizedPoint {
+      x: 0,
+      y: 0,
+      color: [255, 255, 255, 255]
+    };
+
+    let colorizedPoint4 = ColorizedPoint {
+      x: 0,
+      y: 0,
+      color: [255, 255, 255, 255]
+    };
+
+    let positionHash = [
+      [FieldPosition::OCCUPIED(colorizedPoint1), FieldPosition::EMPTY, FieldPosition::EMPTY ].to_vec(),
+      [FieldPosition::EMPTY, FieldPosition::OCCUPIED(colorizedPoint3), FieldPosition::EMPTY].to_vec(),
+      [FieldPosition::OCCUPIED(colorizedPoint2), FieldPosition::EMPTY, FieldPosition::OCCUPIED(colorizedPoint4)].to_vec(),
+    ].to_vec();
+
+    let field = DLAField {
+      field: [].to_vec(),
+      positionHash
+    };
+
+    assert_eq!(field.isStuck(0,0, false), false);
+    assert_eq!(field.isStuck(0,1, false), false);
+    assert_eq!(field.isStuck(0,2, false), false);
+
+    assert_eq!(field.isStuck(1,0, false), false);
+
+    // is stuck because it's neighbor is stuck
+    assert_eq!(field.isStuck(1,1, false), true);
+    assert_eq!(field.isStuck(1,2, false), false);
+
+    assert_eq!(field.isStuck(2,0, false), false);
+
+    // not stuck because it's empty (even though it's neighbor is stuck)
+    assert_eq!(field.isStuck(2,1, false), false);
+
+    // stuck because it's at the bottom and occupied
+    assert_eq!(field.isStuck(2,2, false), true);
   }
 }
