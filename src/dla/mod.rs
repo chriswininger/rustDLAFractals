@@ -4,8 +4,6 @@ use rand::Rng;
 
 #[derive(Clone)]
 pub struct ColorizedPoint {
-  pub x: u32,
-  pub y: u32,
   pub color: [u8; 4]
 }
 
@@ -13,11 +11,10 @@ pub struct ColorizedPoint {
 pub enum FieldPosition {
   EMPTY,
   OCCUPIED(ColorizedPoint),
-  STUCK
+  STUCK(ColorizedPoint)
 }
 
 pub struct DLAField {
-  pub field: Vec<ColorizedPoint>,
   pub positionHash: Vec<Vec<FieldPosition>>
 }
 
@@ -26,33 +23,22 @@ impl DLAField {
     let mut rng = rand::thread_rng();
     let mut positionHash = DLAField::generateEmptyPositionHash(width, height);
 
-    let field = (0..numPoints)
-       .map(|ndx| {
-         let mut x = rng.gen_range(0, width as u32);
-         let mut y = rng.gen_range(0, height as u32);
+    for i in 0..numPoints {
+      let mut x = rng.gen_range(0, width as u32);
+      let mut y = rng.gen_range(0, height as u32);
 
-         while DLAField::isPositionOccupied(&positionHash, x as i32, y as i32) {
-           x = rng.gen_range(0, width as u32);
-           y = rng.gen_range(0, height as u32);
-         }
+      while DLAField::isPositionOccupied(&positionHash, x as i32, y as i32) {
+        x = rng.gen_range(0, width as u32);
+        y = rng.gen_range(0, height as u32);
+      }
 
-         positionHash[x as usize][y as usize] = FieldPosition::OCCUPIED(ColorizedPoint {
-           x,
-           y,
-           color: [255, 0, 0, 255]
-         });
-
-         // return the new point
-         ColorizedPoint {
-           x,
-           y,
-           color: [255, 0, 0, 255]
-         }
-       })
-       .collect();
+      // occupy the position
+      positionHash[x as usize][y as usize] = FieldPosition::OCCUPIED(ColorizedPoint {
+        color: [255, 0, 0, 255]
+      });
+    }
 
     DLAField {
-      field,
       positionHash
     }
   }
@@ -70,16 +56,25 @@ impl DLAField {
 
       let ndx = i as usize * 4;
 
-      if DLAField::isPositionOccupied(&self.positionHash, x as i32, y as i32) {
-        values[ndx] = 255;
-        values[ndx + 1] = 0;
-        values[ndx + 2] = 0;
-        values[ndx + 3] = 255;
-      } else {
-        values[ndx] = 0;
-        values[ndx + 1] = 0;
-        values[ndx + 2] = 0;
-        values[ndx + 3] = 255;
+      match &self.positionHash[x][y] {
+        FieldPosition::OCCUPIED(colorizedPoint) => {
+          values[ndx] = colorizedPoint.color[0];
+          values[ndx + 1] = colorizedPoint.color[1];
+          values[ndx + 2] = colorizedPoint.color[2];
+          values[ndx + 3] = colorizedPoint.color[3];
+        },
+        FieldPosition::STUCK(colorizedPoint) => {
+          values[ndx] = colorizedPoint.color[0];
+          values[ndx + 1] = colorizedPoint.color[1];
+          values[ndx + 2] = colorizedPoint.color[2];
+          values[ndx + 3] = colorizedPoint.color[3];
+        }
+        FieldPosition::EMPTY => {
+          values[ndx] = 0;
+          values[ndx + 1] = 0;
+          values[ndx + 2] = 0;
+          values[ndx + 3] = 255;
+        }
       }
     }
 
@@ -89,9 +84,18 @@ impl DLAField {
   pub fn nextState(&mut self) -> bool {
     let mut isDone = true;
 
+    // might be better to walk the y array in reverse so we check/update lowest first
     let mut cntStuck = 0;
+
+    /*
+      TODO (CAW) While walking backwords is better perhaps it would be better to have list of (x, y)
+      with only the occupied points (like we used to) and only iterate over those, only issue is
+      can't go top to bottom so... (if doing this consider a move function(x1, y1, x2, y2) which
+      updates both pieces of state
+    */
     for x in 0..self.getWidth() as u32 {
-      for y in 0..self.getHeight() as u32 {
+      // walk y in reverse so points near the bottom get stuck first
+      for y in (0..self.getHeight() as u32).rev() {
         let stuck = self.isStuck(x as i32, y as i32, false);
         let curVal =  &self.positionHash[x as usize][y as usize];
 
@@ -108,44 +112,26 @@ impl DLAField {
 
               self.positionHash[newPosition.0 as usize][newPosition.1 as usize] =
                   FieldPosition::OCCUPIED(ColorizedPoint {
-                    x: newPosition.0 as u32,
-                    y: newPosition.1 as u32,
                     color: [255, 0, 0, 255]
                   });
 
               self.positionHash[x as usize][y as usize] = FieldPosition::EMPTY;
             } else {
-              self.positionHash[x as usize][y as usize] = FieldPosition::STUCK;
+              self.positionHash[x as usize][y as usize] = FieldPosition::STUCK(ColorizedPoint {
+                  color: [255, 0, 0, 255]
+                });
             }
           },
-          FieldPosition::STUCK => {},
+          FieldPosition::STUCK(coloredPoint) => {},
           FieldPosition::EMPTY => {}
         }
-
-//        if  !stuck && !self.isEmpty(x as i32, y as i32) {
-//          isDone = false;
-//
-//          let newPosition = self.findNextPosition(x as i32, y as i32);
-//
-//          self.positionHash[newPosition.0 as usize][newPosition.1 as usize] =
-//             FieldPosition::OCCUPIED(ColorizedPoint {
-//               x: newPosition.0 as u32,
-//               y: newPosition.1 as u32,
-//               color: [255, 0, 0, 255]
-//             });
-//
-//          self.positionHash[x as usize][y as usize] = FieldPosition::EMPTY;
-//        } else if let FieldPosition::OCCUPIED(ColorizedPoint) = self.positionHash[x as usize][y as usize] {
-//          if stuck {
-//            self.positionHash[x as usize][y as usize] = FieldPosition::STUCK
-//          }
-//        }
       }
     }
 
-    if cntStuck > 0 {
-      println!("!!! cntStuc: {}", cntStuck);
+    if cntStuck % 100 == 0 {
+      println!("cntStuck: {}", cntStuck);
     }
+
     isDone
   }
 
@@ -159,16 +145,16 @@ impl DLAField {
 
   fn generateEmptyPositionHash(width: usize, height: usize) -> Vec<Vec<FieldPosition>> {
     (0..width)
-       .map(|x| {
-         let col = (0..height)
-            .map(|y| {
-              FieldPosition::EMPTY
-            })
-            .collect();
+        .map(|x| {
+          let col = (0..height)
+              .map(|y| {
+                FieldPosition::EMPTY
+              })
+              .collect();
 
-         col
-       })
-       .collect()
+          col
+        })
+        .collect()
   }
 
   fn findNextPosition(&self, x: i32, y: i32) -> (i32, i32) {
@@ -178,6 +164,7 @@ impl DLAField {
     let width = self.getWidth() as i32;
     let height = self.getHeight() as i32;
 
+    // TOOD (CAW): Consider precalculating available states and if there is just one possibility take it
     while newX < 0 || newY < 0 || newX >= width as i32 || newY >= height as i32 {
       newX = if rng.gen_bool(0.5) { x + 1 } else { x - 1 };
       newY = if rng.gen_bool(0.75) { y + 1 } else { y - 1 };
@@ -205,29 +192,29 @@ impl DLAField {
     let val = &positionHash[x as usize][y as usize];
     match val {
       FieldPosition::OCCUPIED(point) => true,
-      FieldPosition::STUCK => true,
+      FieldPosition::STUCK(point) => true,
       FieldPosition::EMPTY => false
     }
   }
 
   fn isStuck(&self, x: i32, y: i32, recursion: bool) -> bool {
-//      if x >= WIDTH as i32 {
-//         return false
-//      } else if y >= HEIGHT as i32 {
-//         return  true
-//      } else
-
     let width = self.getWidth() as i32;
     let height = self.getHeight() as i32;
 
-    if let FieldPosition::EMPTY = self.positionHash[x as usize][y as usize] {
-      return false
-    } else if let FieldPosition::STUCK = self.positionHash[x as usize][y as usize] { // SEEMS LIKE WE SHOULD ALWAYS CHECK AND SAY STUCK IF THIS IS STUCK AND JUST NEED TO MAKE SURE WE NEVER ASK OUTSIDE BOUNDS
-      return true
-    } else if y >= height - 1 as i32 {
-      return true
-    } else if recursion {
-      return false
+    match &self.positionHash[x as usize][y as usize] {
+      FieldPosition::EMPTY => {
+        return false
+      },
+      FieldPosition::STUCK(colorizedPoint) => return true,
+      FieldPosition::OCCUPIED(colorizedPoint) => {
+        if y >= height - 1 as i32 {
+          return true;
+        }
+      }
+    }
+
+    if recursion {
+      return  false;
     }
 
     let mut dx: i32 = -1;
@@ -275,10 +262,12 @@ mod tests {
 
   #[test]
   fn isPositionOccupied_shouldReturnCorrectValues() {
-    let colorizedPoint1: ColorizedPoint = ColorizedPoint { x: 0, y: 0, color: [0 ,0, 0,0 ]};
+    let colorizedPoint1: ColorizedPoint = ColorizedPoint { color: [0 ,0, 0,0 ]};
+    let colorizedPoint2: ColorizedPoint = ColorizedPoint { color: [0 ,0, 0,0 ]};
+
     let positionHash = [
       [FieldPosition::EMPTY, FieldPosition::OCCUPIED(colorizedPoint1)].to_vec(),
-      [FieldPosition::STUCK, FieldPosition::EMPTY].to_vec()
+      [FieldPosition::STUCK(colorizedPoint2), FieldPosition::EMPTY].to_vec()
     ].to_vec();
 
     let position = DLAField::isPositionOccupied(&positionHash, 0, 0);
@@ -297,26 +286,18 @@ mod tests {
   #[test]
   fn isStuck_shouldReturnCorrectValues() {
     let colorizedPoint1 = ColorizedPoint {
-      x: 0,
-      y: 0,
       color: [255, 255, 255, 255]
     };
 
     let colorizedPoint2 = ColorizedPoint {
-      x: 0,
-      y: 0,
       color: [255, 255, 255, 255]
     };
 
     let colorizedPoint3 = ColorizedPoint {
-      x: 0,
-      y: 0,
       color: [255, 255, 255, 255]
     };
 
     let colorizedPoint4 = ColorizedPoint {
-      x: 0,
-      y: 0,
       color: [255, 255, 255, 255]
     };
 
@@ -327,7 +308,6 @@ mod tests {
     ].to_vec();
 
     let field = DLAField {
-      field: [].to_vec(),
       positionHash
     };
 
