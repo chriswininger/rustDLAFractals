@@ -118,7 +118,7 @@ impl DLAField {
               self.positionHash[x as usize][y as usize] = FieldPosition::EMPTY;
             } else {
               self.positionHash[x as usize][y as usize] = FieldPosition::STUCK(ColorizedPoint {
-                  color: [255, 0, 0, 255]
+                  color: [0, 255, 0, 255]
                 });
             }
           },
@@ -252,6 +252,25 @@ impl DLAField {
     }
 
     false
+  }
+
+  // this is more for testing
+  pub fn getStuckCount(&self) -> u32 {
+    let mut cnt = 0;
+
+    for x in 0..self.getWidth() {
+      for y in 0..self.getHeight() {
+        match &self.positionHash[x][y] {
+          FieldPosition::EMPTY => {}
+          FieldPosition::OCCUPIED(colorizedPoint) => {}
+          FieldPosition::STUCK(colorizedPoint) =>{
+            cnt +=  1;
+          }
+        }
+      }
+    }
+
+    cnt
   }
 }
 

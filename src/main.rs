@@ -26,6 +26,7 @@ fn main() {
    }
 
    println!("done in {}", start.to(PreciseTime::now()));
+   println!("with {} stuck points out of {}", dlaField.getStuckCount(), NUM_POINTS);
    saveToPNG(&dlaField);
 }
 
