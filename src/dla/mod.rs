@@ -110,13 +110,18 @@ impl DLAField {
 
               let newPosition = self.findNextPosition(x as i32, y as i32);
 
-              self.positionHash[newPosition.0 as usize][newPosition.1 as usize] =
-                  FieldPosition::OCCUPIED(ColorizedPoint {
-                    color: [255, 0, 0, 255]
-                  });
+              if x != newPosition.0 as u32 && y != newPosition.1 as u32 {
+                // println!("Found new Position: {}, {} => {}, {}", x, y, newPosition.0, newPosition.1);
 
-              self.positionHash[x as usize][y as usize] = FieldPosition::EMPTY;
+                self.positionHash[newPosition.0 as usize][newPosition.1 as usize] =
+                    FieldPosition::OCCUPIED(ColorizedPoint {
+                      color: [255, 0, 0, 255]
+                    });
+
+                self.positionHash[x as usize][y as usize] = FieldPosition::EMPTY;
+              }
             } else {
+              // println!("Keep old Positon: {}, {}", x, y);
               self.positionHash[x as usize][y as usize] = FieldPosition::STUCK(ColorizedPoint {
                   color: [0, 255, 0, 255]
                 });
@@ -125,6 +130,11 @@ impl DLAField {
           FieldPosition::STUCK(coloredPoint) => {},
           FieldPosition::EMPTY => {}
         }
+
+//        let cnt = self.getOccpupiedCount();
+//        if cnt != 60000 {
+//          println!("!!! count changed: {}", cnt)
+//        }
       }
     }
 
@@ -255,14 +265,35 @@ impl DLAField {
   }
 
   // this is more for testing
+  pub fn getOccpupiedCount(&self) -> u32 {
+    let mut cnt = 0;
+
+    for x in 0..self.getWidth() {
+      for y in 0..self.getHeight() {
+        match &self.positionHash[x][y] {
+          FieldPosition::EMPTY => {},
+          FieldPosition::OCCUPIED(colorizedPoint) => {
+            cnt += 1;
+          },
+          FieldPosition::STUCK(colorizedPoint) => {
+            cnt += 1;
+          }
+        }
+      }
+    }
+
+    cnt
+  }
+
+  // this is more for testing
   pub fn getStuckCount(&self) -> u32 {
     let mut cnt = 0;
 
     for x in 0..self.getWidth() {
       for y in 0..self.getHeight() {
         match &self.positionHash[x][y] {
-          FieldPosition::EMPTY => {}
-          FieldPosition::OCCUPIED(colorizedPoint) => {}
+          FieldPosition::EMPTY => {},
+          FieldPosition::OCCUPIED(colorizedPoint) => {},
           FieldPosition::STUCK(colorizedPoint) =>{
             cnt +=  1;
           }

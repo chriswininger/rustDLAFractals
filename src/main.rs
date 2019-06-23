@@ -10,7 +10,7 @@ use std::io::BufWriter;
 mod dla;
 use dla::DLAField;
 
-const NUM_POINTS: i32 = 60000;
+const NUM_POINTS: i32 = 15000;
 const WIDTH: u32 = 500;
 const HEIGHT: u32 = 500;
 const ONE_DIMENSIONAL_LENGTH: u32 = WIDTH * HEIGHT;
@@ -20,6 +20,8 @@ fn main() {
    let mut dlaField =
       DLAField::new(NUM_POINTS, WIDTH as usize, HEIGHT as usize);
 
+   println!("initialized with: {} points", dlaField.getOccpupiedCount());
+
    let mut trials = 0;
    while !dlaField.nextState() {
       trials += 1;
@@ -27,6 +29,7 @@ fn main() {
 
    println!("done in {}", start.to(PreciseTime::now()));
    println!("with {} stuck points out of {}", dlaField.getStuckCount(), NUM_POINTS);
+   println!("ended with {} occupied points", dlaField.getOccpupiedCount());
    saveToPNG(&dlaField);
 }
 
