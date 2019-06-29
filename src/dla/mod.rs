@@ -43,9 +43,9 @@ impl DLAField {
     }
   }
 
-  pub fn getOneDimensionalRepresentation(&self) -> Vec<u8> {
-    let width = self.getWidth();
-    let height = self.getHeight();
+  pub fn getOneDimensionalRepresentation(&self, scale: usize) -> Vec<u8> {
+    let width = self.getWidth() * scale;
+    let height = self.getHeight() * scale;
     let oneDimensionalLen = width * height;
 
     let mut values = vec![0 as u8; oneDimensionalLen * 4];
@@ -54,9 +54,13 @@ impl DLAField {
       let x = i % width;
       let y = i / height;
 
+      let xOriginal = x / scale as usize;
+      let yOriginal = y / scale as usize;
+
       let ndx = i as usize * 4;
 
-      match &self.positionHash[x][y] {
+      // TODO (CAW) Not working if one dimension bigger than another
+      match &self.positionHash[xOriginal][yOriginal] {
         FieldPosition::OCCUPIED(colorizedPoint) => {
           values[ndx] = colorizedPoint.color[0];
           values[ndx + 1] = colorizedPoint.color[1];

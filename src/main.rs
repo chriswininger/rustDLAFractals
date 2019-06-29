@@ -10,10 +10,9 @@ use std::io::BufWriter;
 mod dla;
 use dla::DLAField;
 
-const NUM_POINTS: i32 = 15000;
-const WIDTH: u32 = 500;
-const HEIGHT: u32 = 500;
-const ONE_DIMENSIONAL_LENGTH: u32 = WIDTH * HEIGHT;
+const NUM_POINTS: i32 = 120000;
+const WIDTH: u32 = 1920;
+const HEIGHT: u32 = 1920;
 
 fn main() {
    let start = PreciseTime::now();
@@ -34,14 +33,15 @@ fn main() {
 }
 
 fn saveToPNG(dlaField: &DLAField) {
+   let scale = 1;
    let path = Path::new(r"/Users/chris/projects/rustDLAFractals/testImageFractal.png");
    let file = File::create(path).unwrap();
    let ref mut w = BufWriter::new(file);
 
-   let mut encocer = png::Encoder::new(w, WIDTH, HEIGHT);
+   let mut encocer = png::Encoder::new(w, WIDTH * scale, HEIGHT * scale);
    encocer.set(png::ColorType::RGBA).set(png::BitDepth::Eight);
    let mut writer = encocer.write_header().unwrap();
 
-   let data = dlaField.getOneDimensionalRepresentation();
+   let data = dlaField.getOneDimensionalRepresentation(scale as usize);
    writer.write_image_data(&data).unwrap();
 }
